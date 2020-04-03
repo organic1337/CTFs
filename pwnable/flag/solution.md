@@ -1,4 +1,4 @@
-# Solution for flag
+# Solution for `flag`
 This challange can be solved by these steps:
 
 - Open the elf in GDB `gdb flag`
