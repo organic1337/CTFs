@@ -545,3 +545,5 @@ MigrationBackup/
 
 # End of https://www.gitignore.io/api/c,linux,python,virtualenv,visualstudio,visualstudiocode
 
+
+**/.gdb_history
