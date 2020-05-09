@@ -87,7 +87,7 @@ pad = lambda s: s + (BLOCK_SIZE - len(s) % BLOCK_SIZE) * PADDING
 ```
 ### How the plaintext is composed.
 Basically the format is:
-`{id}-{password}-cookie`.
+`id-password-cookie`.
 We're also given an example id and password:
 
 ```python
