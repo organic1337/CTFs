@@ -20,7 +20,7 @@ def get_encrypted(identity: str, password: str) -> List[str]:
 
     encrypted_data = re.search(r'\((?P<encrypted>.*)\)', raw_response).group('encrypted')
     result = [encrypted_data[i:i + BLOCK_SIZE * 2] for i in range(0, len(encrypted_data), BLOCK_SIZE * 2)]
-    # print(result)
+
     return result
 
 

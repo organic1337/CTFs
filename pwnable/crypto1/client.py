@@ -2,9 +2,9 @@
 from Crypto.Cipher import AES
 import base64
 import os, sys
-import xmlrpclib
+i##mport xmlrpclib
 rpc = xmlrpclib.ServerProxy("http://pwnable.kr:9100/")
-
+1
 BLOCK_SIZE = 16
 PADDING = '\x00'
 pad = lambda s: s + (BLOCK_SIZE - len(s) % BLOCK_SIZE) * PADDING

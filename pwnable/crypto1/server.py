@@ -4,7 +4,7 @@ from SimpleXMLRPCServer import SimpleXMLRPCServer
 from Crypto.Cipher import AES
 import os, sys
 
-BLOCK_SIZE = 16
+BLOCK_SIZE = 1
 PADDING = '\x00'
 pad = lambda s: s + (BLOCK_SIZE - len(s) % BLOCK_SIZE) * PADDING
 EncodeAES = lambda c, s: c.encrypt(pad(s)).encode('hex')
