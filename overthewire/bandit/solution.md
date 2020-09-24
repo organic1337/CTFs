@@ -118,3 +118,45 @@ strings data.txt | grep ==
 
 ### Level 10
 password: `truKLdjsbJ5g7yyJ2X2R0o3a5HQJFuLk`
+
+We're told that the password is stored in base64 format in `data.txt` file,
+so just do:
+```bash
+cat data.txt | base64 -d
+```
+
+### Level 11
+password: `IFukwKGsFW8MOq3IRFqrxE1hxTNEbUPR`
+
+Ok so now we know that the password is in `data.txt`,
+and all the characters are rotated by 13. After reading
+[this]() wikipedia page, we know that we just need use `tr` to substitute
+a letter with it inverse
+```bash
+cat data.txt | tr a-mn-zA-MN-Z n-za-mN-ZA-M
+```
+
+
+### Level 12
+password: `5Te8Y4drgCRfCx8ugdwuEX8KFC6k2EUu`
+
+Ok so now we're told that the file is compressed multiple times...
+I thought mayber 2 or three times but it was 9 times!!!
+What I had to do was using the `file` command to see what type
+of compression was used and decompress it every time.
+
+```bash
+file data.txt
+
+# Commands that were used: 
+gunzip < data.txt > data2.txt
+tar --extract -f data
+bzip2 -d data
+```
+
+### Level 13
+password: `8ZjyCRiBWFYkneahHwxCv3wb2a1ORpYL`
+
+
+
+
