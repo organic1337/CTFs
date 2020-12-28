@@ -259,7 +259,6 @@ Since base64 encoded output is about 4/3 greater than it's input, we have about
 
 ```
 
-In gdb, the ebp equals: `0xffffd168`
 
 ## Overriding the canaary 
 
@@ -274,6 +273,8 @@ QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB
 
 By using a C program of our own (see calculate_hash/calculate_hash.c) that simulates the behavior of the custom hash function, we can
 calculate the actual canary, and write everything we'd like to the stack :).
+
+
 
 
 
