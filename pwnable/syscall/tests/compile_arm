@@ -1,0 +1,4 @@
+#!/bin/bash
+filename=source
+arm-linux-gnueabi-as -mthumb -R -o $filename.o -k $filename.s &&  arm-linux-gnueabi-ld -o $filename $filename.o && arm-linux-gnueabi-objdump -d $filename && arm-linux-gnueabi-strip $filename
+
