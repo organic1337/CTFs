@@ -175,4 +175,59 @@ What we need to patch is nsown_capable:
 https://github.com/torvalds/linux/blob/v3.11/kernel/capability.c (line 442)
 
 
+### Patching the payload without learning ARM
 
+In order to not waste my time on learning ARM, I decided to write a
+C code that contains a function that always return `true` with the same signature as `nsown_capable`,
+
+Function implementation is in `return_true.c`:
+
+```C
+bool is_capable(uid_t uid) {
+    return true;
+}
+```
+
+Here is how to cross-compile C Code to ARM:
+https://askubuntu.com/questions/250696/how-to-cross-compile-for-arm
+
+
+After compiling the return_true.c code, Let's find the disassembled
+content of the `is_capable` function. I'll first find its address
+by using `readelf` command:
+
+```bash
+$ readelf -a return_true | grep is_capable
+  2762: 00010530    36 FUNC    GLOBAL DEFAULT    4 is_capable
+```
+
+Address is `0x00010530`. Now I'll disassemble the binary by running:
+```bash
+arm-linux-gnueabi-objdump --disassemble return_true | less
+```
+
+Searching for this address will give:
+
+
+```
+00010530 <is_capable>:
+   10530:       e52db004        push    {fp}            ; (str fp, [sp, #-4]!)
+   10534:       e28db000        add     fp, sp, #0
+   10538:       e24dd00c        sub     sp, sp, #12
+   1053c:       e50b0008        str     r0, [fp, #-8]
+   10540:       e3a03001        mov     r3, #1
+   10544:       e1a00003        mov     r0, r3
+   10548:       e28bd000        add     sp, fp, #0
+   1054c:       e49db004        pop     {fp}            ; (ldr fp, [sp], #4)
+   10550:       e12fff1e        bx      lr
+```
+
+This is the disassembled ARM code behind the is_capable function.
+Here it is translated to opcodes only:
+```
+e52db004e28db000e24dd00ce50b0008e3a03001e1a00003e28bd000e49db004e12fff1e
+```
+
+
+In order to patch the `nsown_capable` function we need to write this byte sequence
+to the function's location.

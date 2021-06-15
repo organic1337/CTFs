@@ -2,6 +2,10 @@
 hello_world:
     .asciz "Hello, world\n"
 
+output:
+    .asciz "Hello, world\n"
+
+
 len_hi = . - hello_world
 
 .section .text
