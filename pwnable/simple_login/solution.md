@@ -194,7 +194,7 @@ Out[27]: (b'QUFBQX+SBAhA6xEI\n', 12)
 ```
 
 ## Conclusion
-I solved this channel by finding a BOF in `auth` function that let me write anything to `main`'s base pointer. I manipulated that base pointer so it will point to my own buffer, and then when LEAVE and RET execute, I have full control of `main`'s return address ;)
+I solved this challenge by finding a BOF in `auth` function that let me write anything to `main`'s base pointer. I manipulated that base pointer so it will point to my own buffer, and then when LEAVE and RET execute, I have full control of `main`'s return address ;)
 
 ```
 Authenticate : QUFBQX+SBAhA6xEI

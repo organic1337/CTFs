@@ -32,7 +32,7 @@ OTP mismatch
 otp: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 2.6.24, BuildID[sha1]=f851771b439725c55be4ed4b0e102c2a39f4c196, not stripped
 
 ⋊> /m/o/o/d/w/c/p/otp on master ⨯ checksec otp                                                                                                                                                     09:41:31
-[*] '/media/or/organic_drive/disk_content/workspace/ctfs/pwnable/otp/otp'
+[*] '/ctfs/pwnable/otp/otp'
     Arch:     amd64-64-little
     RELRO:    Partial RELRO
     Stack:    Canary found
