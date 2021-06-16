@@ -1,3 +1,5 @@
+; Basic shellcode for opening a shell.
+; Note that this shellcode contains nullbytes
 jmp caller
 
 open_shell:
@@ -8,8 +10,6 @@ open_shell:
     xor ecx, ecx
     xor edx, edx
     int 0x80
-
-    ret
 
 caller:
     call open_shell
