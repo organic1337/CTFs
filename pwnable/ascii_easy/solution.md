@@ -35,3 +35,54 @@ $ checksec ascii_easy
     NX:       NX enabled
     PIE:      No PIE (0x8048000)
 ```
+
+
+
+### Research
+
+The binary loads libc library by using mmap with a fixed base
+address, so ASLR is not a concern:
+
+
+```C
+
+#define BASE ((void*)0x5555e000)
+
+void main(int argc, char* argv[]){
+    ...
+    int fd = open("/home/ascii_easy/libc-2.15.so", O_RDONLY);
+    
+    ...
+
+    if (mmap(BASE, len_file, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE, fd, 0) != BASE){
+        ...
+    }
+```
+
+
+and ascii validation is applied to our input:
+
+```C
+int is_ascii(int c){
+    if(c>=0x20 && c<=0x7f) return 1;
+    return 0;
+}
+```
+
+So we need to find ascii printable gadgets.
+
+
+
+EXECV address is: `0x5555e000`
+
+
+```
+Breakpoint 1, 0x08048532 in vuln ()
+(gdb) x/1s $edx                                                                                                                                                                                             
+0xffe33bb0:     "@gaU/bin/sh"
+```
+ROPgadget --binary ./libc-2.15.so --offset 0x5555e000 --badbytes "00-1f|80-ff > gadgets.txt
+
+```
+
+

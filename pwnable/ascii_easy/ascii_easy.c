@@ -26,7 +26,7 @@ void main(int argc, char* argv[]){
 
     size_t len_file;
     struct stat st;
-    int fd = open("/media/or/organic_drive/disk_content/workspace/ctfs/pwnable/ascii_easy/libc-2.15.so", O_RDONLY);
+    int fd = open("/home/ascii_easy/libc-2.15.so", O_RDONLY);
     if( fstat(fd,&st) < 0){
         printf("open error. tell admin!\n");
         return;
