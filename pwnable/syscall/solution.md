@@ -2,7 +2,7 @@
 
 Writeup for syscall challenge in pwnable.kr (200 points).
 
-s## Background
+## Background
  
 Syscall challenge is all about a syscall that someone added to the kernel that
 we need to exploit. 
